@@ -48,3 +48,15 @@ export interface Ticket {
     id: number;
     eventId: number;
 }
+
+export interface LIVE_EVENTS {
+    id: number;
+    name: string;
+    place: string;
+    capacity: number;
+    bookingStart: Date;
+    bookingEnd: Date;
+    _count: {
+        tickets: number;
+    };
+}

@@ -48,7 +48,7 @@ export default function LoginPage() {
   } = useForm<OrganizerLoginData>({
     resolver: zodResolver(OrganizerLoginSchema),
     defaultValues: {
-      email: 'john@ex.com',
+      email: 'john@gmail.com',
       password: 'abcdef',
     },
   });

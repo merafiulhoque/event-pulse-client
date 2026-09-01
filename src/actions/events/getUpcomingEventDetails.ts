@@ -8,7 +8,7 @@ import { ErrorResponse } from "../utility/ErrorResponse"
 export const getUpcomingEventDetails = async () => {
     try {
         const resData = await api<EVENTS[]>(
-            API_URLS.UPCOMING_EVENTS,
+            API_URLS.LIVE_EVENTS,
         )
         return resData
     } catch (error) {

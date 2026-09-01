@@ -12,8 +12,9 @@ export const API_URLS = {
     LOGIN: `${BASE_URL}/api/auth/organizer/login`,
     ME: `${BASE_URL}/api/auth/organizer/me`,
     GET_EVENTS: `${BASE_URL}/api/event/all`,
+    LIVE_EVENTS: `${BASE_URL}/api/event/upcoming-events`,
     PUBLISH_EVENTS: `${BASE_URL}/api/event/publish`,
-    UPCOMING_EVENTS: `${BASE_URL}/api/event/upcoming-events`,
+    GET_ONGOING_EVENTS: `${BASE_URL}/api/event/live-events`,
     CHECK_AVAILABILITY: (id: number) => `${BASE_URL}/api/ticket/${id}/availability`,
     BOOK_TICKET: (id: number) => `${BASE_URL}/api/ticket/${id}/book`,
     DOWNLOAD_TICKET: (id: number) => `${BASE_URL}/api/ticket/download/${id}/pdf`

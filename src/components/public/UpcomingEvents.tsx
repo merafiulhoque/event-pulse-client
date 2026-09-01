@@ -70,6 +70,7 @@ export default function UpcomingEvents() {
     mutationFn: getUpcomingEventDetails,
     onSuccess: (response: ApiResponse<EVENTS[] | null>) => {
       if (response.success && response.data) {
+        console.log(response)
         setEvents(response.data);
         setHasFetched(true);
         showToast({ text: response.message, bgColor: "green" });
