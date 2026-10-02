@@ -1,6 +1,7 @@
 'use client';
 
-import { useForm, Controller } from 'react-hook-form';
+import { ReactNode } from 'react';
+import { useForm, Controller, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -9,8 +10,85 @@ import { showToast } from '@/components/utility/ToastStore';
 import { ApiResponse, EVENTS } from '@/types';
 import { publishEvent } from '@/actions/events/publishEvent';
 import { useEventStore } from '@/store/eventStore';
-import { Calendar, Clock, MapPin, Users, CalendarRange, Sparkles } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, CalendarRange, AlertCircle, Loader2 } from 'lucide-react';
 import { IndianDateInput } from '@/components/utility/CustomDateInput';
+
+// ---------- Past-date prevention (India time) ----------
+const TZ = 'Asia/Kolkata';
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // YYYY-MM-DD
+const nowHHmm = () =>
+  new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: TZ });
+
+// Returns an error message if the date (and, for today, the time) is in the past
+function pastError(label: string, date?: string, time?: string): string | undefined {
+  if (!date || !ISO_DATE.test(date)) return undefined; // empty / partial: zod reports that
+  const today = todayISO();
+  if (date < today) return `${label} date can't be in the past`;
+  if (date === today && time && time < nowHHmm()) return `${label} time has already passed today`;
+  return undefined;
+}
+
+// Runs the zod schema first, then adds the past-date checks on top of it
+const resolver: Resolver<EventCreateData> = async (values, context, options) => {
+  const result = await zodResolver(EventCreateSchema)(values, context, options);
+
+  const extra: Record<string, { type: string; message: string }> = {};
+  const add = (field: string, message?: string) => {
+    if (message) extra[field] = { type: 'validate', message };
+  };
+
+  add('date', pastError('Event', values.date) );
+  add('time', pastError('Event', values.date, values.time)?.includes('time') ? pastError('Event', values.date, values.time) : undefined);
+  add('bookingStartDate', pastError('Booking start', values.bookingStartDate));
+  add('bookingStartTime', pastError('Booking start', values.bookingStartDate, values.bookingStartTime)?.includes('time') ? pastError('Booking start', values.bookingStartDate, values.bookingStartTime) : undefined);
+  add('bookingEndDate', pastError('Booking end', values.bookingEndDate));
+  add('bookingEndTime', pastError('Booking end', values.bookingEndDate, values.bookingEndTime)?.includes('time') ? pastError('Booking end', values.bookingEndDate, values.bookingEndTime) : undefined);
+
+  if (Object.keys(extra).length === 0) return result;
+  return { values: {}, errors: { ...(result.errors as object), ...extra } } as any;
+};
+
+// ---------- Styling ----------
+const inputClass =
+  'w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-3 text-base text-slate-100 placeholder-slate-600 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2.5 sm:text-sm';
+const timeClass =
+  inputClass +
+  ' [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-60';
+
+function Field({
+  label,
+  icon,
+  error,
+  htmlFor,
+  className = '',
+  children,
+}: {
+  label: string;
+  icon?: ReactNode;
+  error?: string;
+  htmlFor?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <label htmlFor={htmlFor} className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-300">
+        {icon}
+        {label}
+        <span className="text-indigo-400">*</span>
+      </label>
+      {children}
+      {error && (
+        <p role="alert" className="mt-1.5 flex items-start gap-1 text-xs font-medium text-rose-400">
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function PublishEvent() {
   const router = useRouter();
@@ -19,9 +97,11 @@ export default function PublishEvent() {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<EventCreateData>({
-    resolver: zodResolver(EventCreateSchema),
+    resolver,
+    mode: 'onChange', // show past-date errors as soon as the date is typed
     defaultValues: {
       capacity: 50,
     },
@@ -37,21 +117,21 @@ export default function PublishEvent() {
     onSuccess: (response: ApiResponse<EVENTS | null>) => {
       showToast({
         text: response.message,
-        bgColor: response.success ? "green" : "red",
+        bgColor: response.success ? 'green' : 'red',
       });
 
       if (response.success && response.data) {
         addEvent(response.data);
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push('/dashboard');
           router.refresh();
         }, 1000);
       }
     },
     onError: (err: any) => {
       showToast({
-        text: err instanceof Error ? err.message : "Failed to publish event",
-        bgColor: "red",
+        text: err instanceof Error ? err.message : 'Failed to publish event',
+        bgColor: 'red',
       });
     },
   });
@@ -60,222 +140,120 @@ export default function PublishEvent() {
     mutation.mutate(data);
   };
 
+  // When the chosen date is today, the time picker can't go earlier than now
+  const [eventDate, startDate, endDate] = watch(['date', 'bookingStartDate', 'bookingEndDate']);
+  const minTime = (date?: string) => (date === todayISO() ? nowHHmm() : undefined);
+
+  const iconClass = 'h-3.5 w-3.5 text-indigo-400';
+
   return (
-    <div className="h-screen w-screen bg-slate-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] flex items-center justify-center p-3 md:p-4 overflow-hidden">
-      
-      <div className="w-full max-w-4xl h-[94vh] max-h-[700px] bg-slate-900/70 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl shadow-indigo-950/50 flex flex-col overflow-hidden relative">
-        
-        {/* Header */}
-        <div className="px-5 py-3.5 flex items-center justify-between relative z-10 border-b border-slate-800/80 bg-slate-900/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-indigo-500/20 to-violet-500/20 rounded-xl border border-indigo-500/30">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-base md:text-lg font-bold tracking-tight text-slate-100">
-                Publish New Event
-              </h1>
-              <p className="text-[11px] text-slate-400">Type naturally (e.g. 22102026) for auto formatting</p>
-            </div>
+    // Plain flowing page (no card, no inner scroll container): the layout's <main> handles scrolling.
+    <div className="mx-auto w-full max-w-3xl">
+      {/* Header */}
+      <header className="pb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-white">Publish new event</h1>
+        <p className="mt-1.5 text-sm text-slate-400">
+          Type dates naturally (e.g. 22102026) and they format automatically. Past dates are not allowed.
+        </p>
+      </header>
+
+      <form id="publish-form" onSubmit={handleSubmit(onSubmit)} noValidate className="divide-y divide-slate-800 border-y border-slate-800">
+        {/* General info */}
+        <section className="py-7">
+          <h2 className="text-base font-semibold text-white">General info</h2>
+          <p className="mb-5 mt-0.5 text-sm text-slate-500">What, where and when the event takes place.</p>
+
+          {/* One column on mobile, two from md up */}
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Field label="Event name" htmlFor="name" error={errors.name?.message} className="md:col-span-2">
+              <input id="name" type="text" {...register('name')} placeholder="e.g. Tech Innovators Summit 2026" className={inputClass} />
+            </Field>
+
+            <Field label="Location / place" htmlFor="place" icon={<MapPin className={iconClass} />} error={errors.place?.message} className="md:col-span-2">
+              <input id="place" type="text" {...register('place')} placeholder="e.g. Biswa Bangla Convention Centre, Kolkata" className={inputClass} />
+            </Field>
+
+            <Field label="Event date" icon={<Calendar className={iconClass} />} error={errors.date?.message}>
+              <Controller
+                control={control}
+                name="date"
+                render={({ field }) => (
+                  <IndianDateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={!!errors.date} />
+                )}
+              />
+            </Field>
+
+            <Field label="Event time (24h)" htmlFor="time" icon={<Clock className={iconClass} />} error={errors.time?.message}>
+              <input id="time" type="time" min={minTime(eventDate)} {...register('time')} className={timeClass} />
+            </Field>
+
+            <Field label="Maximum seat capacity" htmlFor="capacity" icon={<Users className={iconClass} />} error={errors.capacity?.message} className="md:col-span-2">
+              <input id="capacity" type="number" inputMode="numeric" {...register('capacity', { valueAsNumber: true })} placeholder="50" className={inputClass} />
+            </Field>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-            🇮🇳 Auto-Hyphen DD-MM-YYYY
-          </span>
-        </div>
+        </section>
 
-        {/* Scrollable Form Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-          <form id="publish-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5 relative z-10">
-            
-            {/* Section 1: General Info */}
-            <div className="space-y-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20">
-                1. General Info
-              </span>
+        {/* Booking window */}
+        <section className="py-7">
+          <h2 className="text-base font-semibold text-white">Booking window</h2>
+          <p className="mb-5 mt-0.5 text-sm text-slate-500">When attendees can start and stop booking seats.</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                    Event Name <span className="text-indigo-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    {...register("name")}
-                    placeholder="e.g. Tech Innovators Summit 2026"
-                    className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 shadow-inner"
-                  />
-                  {errors.name && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.name.message}</p>}
-                </div>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Field label="Start date" icon={<CalendarRange className={iconClass} />} error={errors.bookingStartDate?.message}>
+              <Controller
+                control={control}
+                name="bookingStartDate"
+                render={({ field }) => (
+                  <IndianDateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={!!errors.bookingStartDate} />
+                )}
+              />
+            </Field>
 
-                <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-indigo-400" />
-                    <span>Location / Place</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    {...register("place")}
-                    placeholder="e.g. Biswa Bangla Convention Centre, Kolkata"
-                    className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 shadow-inner"
-                  />
-                  {errors.place && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.place.message}</p>}
-                </div>
+            <Field label="Start time" htmlFor="bookingStartTime" icon={<Clock className={iconClass} />} error={errors.bookingStartTime?.message}>
+              <input id="bookingStartTime" type="time" min={minTime(startDate)} {...register('bookingStartTime')} className={timeClass} />
+            </Field>
 
-                {/* Reusable Event Date Field */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-indigo-400" />
-                    <span>Event Date (DD-MM-YYYY)</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <Controller
-                    control={control}
-                    name="date"
-                    render={({ field }) => (
-                      <IndianDateInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        error={!!errors.date}
-                      />
-                    )}
-                  />
-                  {errors.date && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.date.message}</p>}
-                </div>
+            <Field label="End date" icon={<CalendarRange className={iconClass} />} error={errors.bookingEndDate?.message}>
+              <Controller
+                control={control}
+                name="bookingEndDate"
+                render={({ field }) => (
+                  <IndianDateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={!!errors.bookingEndDate} />
+                )}
+              />
+            </Field>
 
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-indigo-400" />
-                    <span>Event Time (24h)</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <input
-                    type="time"
-                    {...register("time")}
-                    className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 shadow-inner [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-                  />
-                  {errors.time && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.time.message}</p>}
-                </div>
+            <Field label="End time" htmlFor="bookingEndTime" icon={<Clock className={iconClass} />} error={errors.bookingEndTime?.message}>
+              <input id="bookingEndTime" type="time" min={minTime(endDate)} {...register('bookingEndTime')} className={timeClass} />
+            </Field>
+          </div>
+        </section>
+      </form>
 
-                <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <Users className="w-3 h-3 text-indigo-400" />
-                    <span>Maximum Seat Capacity</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    {...register("capacity", { valueAsNumber: true })}
-                    placeholder="50"
-                    className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 shadow-inner"
-                  />
-                  {errors.capacity && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.capacity.message}</p>}
-                </div>
-              </div>
-            </div>
-
-            {/* Section 2: Booking Windows */}
-            <div className="space-y-3 pt-3 border-t border-slate-800/80">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20">
-                2. Booking Windows
-              </span>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Reusable Booking Start Date */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <CalendarRange className="w-3 h-3 text-indigo-400" />
-                    <span>Start Date (DD-MM-YYYY)</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <Controller
-                    control={control}
-                    name="bookingStartDate"
-                    render={({ field }) => (
-                      <IndianDateInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        error={!!errors.bookingStartDate}
-                      />
-                    )}
-                  />
-                  {errors.bookingStartDate && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.bookingStartDate.message}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-indigo-400" />
-                    <span>Start Time</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <input
-                    type="time"
-                    {...register("bookingStartTime")}
-                    className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 shadow-inner [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-                  />
-                  {errors.bookingStartTime && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.bookingStartTime.message}</p>}
-                </div>
-
-                {/* Reusable Booking End Date */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <CalendarRange className="w-3 h-3 text-indigo-400" />
-                    <span>End Date (DD-MM-YYYY)</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <Controller
-                    control={control}
-                    name="bookingEndDate"
-                    render={({ field }) => (
-                      <IndianDateInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        error={!!errors.bookingEndDate}
-                      />
-                    )}
-                  />
-                  {errors.bookingEndDate && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.bookingEndDate.message}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-indigo-400" />
-                    <span>End Time</span> <span className="text-indigo-400">*</span>
-                  </label>
-                  <input
-                    type="time"
-                    {...register("bookingEndTime")}
-                    className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 shadow-inner [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-                  />
-                  {errors.bookingEndTime && <p className="mt-1 text-[11px] text-rose-400 font-medium">⚠️ {errors.bookingEndTime.message}</p>}
-                </div>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="px-5 py-3 border-t border-slate-800/80 bg-slate-900/50 flex items-center justify-end gap-3 relative z-10">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-all hover:bg-slate-800/50 rounded-xl cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="publish-form"
-            disabled={mutation.isPending}
-            className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
-          >
-            {mutation.isPending ? (
-              <>
-                <span className="animate-spin">⏳</span>
-                Publishing...
-              </>
-            ) : (
-              'Publish Event'
-            )}
-          </button>
-        </div>
-
+      {/* Actions: stacked full-width on mobile (Publish on top), right-aligned from sm up */}
+      <div className="flex flex-col-reverse gap-3 pb-6 pt-6 sm:flex-row sm:items-center sm:justify-end">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="cursor-pointer rounded-xl px-4 py-3 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 sm:py-2.5"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="publish-form"
+          disabled={mutation.isPending}
+          className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 disabled:cursor-not-allowed disabled:opacity-50 sm:py-2.5"
+        >
+          {mutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Publishing...
+            </>
+          ) : (
+            'Publish event'
+          )}
+        </button>
       </div>
     </div>
   );

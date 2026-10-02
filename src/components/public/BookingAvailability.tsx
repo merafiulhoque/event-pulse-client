@@ -8,11 +8,17 @@ import { checkAvailability } from '@/actions/tickets/checkAvailability';
 import { showToast } from '@/components/utility/ToastStore';
 import Loader from '@/components/utility/Loader';
 import Link from 'next/link';
+import { ArrowLeft, ArrowRight, CalendarDays, Clock, MapPin, Users, RefreshCw, Loader2, SearchX } from 'lucide-react';
+
+const formatDate = (v: string | Date) =>
+  new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+const formatTime = (v: string | Date) =>
+  new Date(v).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
 
 export default function BookingAvailability() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+
   const idParam = searchParams.get('id');
   const eventId = idParam ? Number(idParam) : null;
 
@@ -39,13 +45,13 @@ export default function BookingAvailability() {
   // Hook is declared unconditionally here every single render
   const availabilityMutation = useMutation({
     mutationFn: async () => {
-      if (!eventId) throw new Error("Invalid event ID");
+      if (!eventId) throw new Error('Invalid event ID');
       return await checkAvailability(eventId);
     },
     onSuccess: (response) => {
       showToast({
         text: response.message,
-        bgColor: response.success ? "green" : "red",
+        bgColor: response.success ? 'green' : 'red',
       });
 
       if (response.success && response.data !== null && response.data !== undefined) {
@@ -54,8 +60,8 @@ export default function BookingAvailability() {
     },
     onError: (err: any) => {
       showToast({
-        text: err instanceof Error ? err.message : "Network Error",
-        bgColor: "red",
+        text: err instanceof Error ? err.message : 'Network Error',
+        bgColor: 'red',
       });
     },
   });
@@ -67,97 +73,152 @@ export default function BookingAvailability() {
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center max-w-md w-full shadow-2xl">
-          <h2 className="text-lg font-bold text-white mb-2">Event Not Found</h2>
-          <p className="text-xs text-slate-400 mb-6">The requested event could not be found or your session data is empty.</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 px-4 py-10 text-slate-100">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-6 text-center shadow-2xl shadow-black/30 sm:p-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900">
+            <SearchX className="h-7 w-7 text-slate-500" />
+          </div>
+          <h1 className="mt-5 text-xl font-bold text-white">Event not found</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            The requested event could not be found or your session data is empty.
+          </p>
           <Link
             href="/upcoming-events"
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all"
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
           >
-            Back to Upcoming Events
+            <ArrowLeft className="h-4 w-4" />
+            Back to upcoming events
           </Link>
         </div>
       </div>
     );
   }
 
+  // Share of capacity still free (used for the bar and its colour)
+  const pct =
+    availableSeats !== null && event.capacity > 0
+      ? Math.min(100, Math.max(0, Math.round((availableSeats / event.capacity) * 100)))
+      : 0;
+  const soldOut = availableSeats !== null && availableSeats <= 0;
+  const low = availableSeats !== null && !soldOut && pct <= 20;
+  const barColor = soldOut ? 'bg-rose-500' : low ? 'bg-amber-400' : 'bg-emerald-400';
+  const numColor = soldOut ? 'text-rose-400' : low ? 'text-amber-400' : 'text-emerald-400';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-        
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+      {/* Top bar */}
+      <header className="border-b border-slate-900">
+        <div className="mx-auto flex h-14 w-full max-w-xl items-center justify-between px-4 sm:px-0">
           <Link
             href="/upcoming-events"
-            className="text-xs font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
+            className="inline-flex items-center gap-1.5 rounded-lg py-2 pr-2 text-sm font-medium text-slate-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
           >
-            ← Back
+            <ArrowLeft className="h-4 w-4" />
+            Back
           </Link>
-          <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 bg-slate-800 text-slate-400 rounded-md">
-            Event ID: #{event.id}
+          <span className="rounded-md border border-slate-700/60 bg-slate-800/70 px-2 py-1 font-mono text-[11px] text-slate-400">
+            Event #{event.id}
           </span>
         </div>
+      </header>
 
-        <div className="space-y-3">
-          <h1 className="text-2xl font-bold tracking-tight text-white">{event.name}</h1>
-          <p className="text-xs text-slate-400 flex items-center gap-1.5">
-            <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {event.place}
-          </p>
-
-          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 grid grid-cols-2 gap-4 text-xs mt-4">
-            <div>
-              <span className="text-slate-500 block mb-1">Event Date</span>
-              <span className="font-semibold text-slate-200">{new Date(event.date).toLocaleDateString()}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block mb-1">Total Capacity</span>
-              <span className="font-semibold text-slate-200">{event.capacity} Seats</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <main className="flex flex-1 items-start justify-center px-4 py-6 sm:items-center sm:py-12">
+        <div className="w-full max-w-xl space-y-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-black/30 sm:space-y-6 sm:p-8">
+          {/* Event heading */}
           <div>
-            <h3 className="text-sm font-medium text-slate-200">Real-Time Seat Status</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {availableSeats !== null
-                ? `${availableSeats} seats available right now`
-                : "Verify current booking window and capacity"}
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">{event.name}</h1>
+            <p className="mt-2 flex items-start gap-2 text-sm text-slate-400">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400/80" />
+              <span className="min-w-0 break-words">{event.place}</span>
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* Details */}
+          <dl className="divide-y divide-slate-800/80 rounded-xl border border-slate-800 bg-slate-950/60 text-sm">
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="flex items-center gap-2 text-slate-500">
+                <CalendarDays className="h-4 w-4" />
+                Event date
+              </dt>
+              <dd className="font-medium text-slate-200">{formatDate(event.date)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="flex items-center gap-2 text-slate-500">
+                <Clock className="h-4 w-4" />
+                Event time
+              </dt>
+              <dd className="font-medium text-slate-200">{formatTime(event.date)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="flex items-center gap-2 text-slate-500">
+                <Users className="h-4 w-4" />
+                Total capacity
+              </dt>
+              <dd className="font-medium text-slate-200">{event.capacity} Seats</dd>
+            </div>
+          </dl>
+
+          {/* Real-time seat status */}
+          <section className="rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-5">
+            <h2 className="text-base font-semibold text-slate-100">Real-time seat status</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {availableSeats !== null
+                ? `${availableSeats} seats available right now`
+                : 'Verify current booking window and capacity'}
+            </p>
+
             {availableSeats !== null && (
-              <span className="text-lg font-mono font-bold text-emerald-400 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                {availableSeats} Left
-              </span>
+              <div className="mt-4" aria-live="polite">
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-4xl font-bold tabular-nums ${numColor}`}>{availableSeats}</span>
+                  <span className="text-sm text-slate-500">
+                    {soldOut ? 'left, sold out' : `left of ${event.capacity}`}
+                  </span>
+                </div>
+                <div
+                  className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-800"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Seats remaining"
+                >
+                  <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
             )}
+
             <button
               onClick={() => availabilityMutation.mutate()}
               disabled={availabilityMutation.isPending}
-              className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
+              className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {availabilityMutation.isPending ? "Checking..." : "Check Availability"}
+              {availabilityMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Check availability
+                </>
+              )}
             </button>
-          </div>
-        </div>
+          </section>
 
-        {availableSeats !== null && availableSeats > 0 && (
-          <div className="pt-2">
+          {/* Checkout */}
+          {availableSeats !== null && availableSeats > 0 && (
             <button
               onClick={() => router.push(`/booking/checkout?id=${event.id}&seats=${availableSeats}`)}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
             >
-              Proceed to Checkout →
+              Proceed to checkout
+              <ArrowRight className="h-4 w-4" />
             </button>
-          </div>
-        )}
-
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

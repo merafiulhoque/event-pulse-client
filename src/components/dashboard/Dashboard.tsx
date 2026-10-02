@@ -17,7 +17,7 @@ export default function DashboardPage() {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'Asia/Kolkata'
+      timeZone: 'Asia/Kolkata',
     });
   };
 
@@ -27,7 +27,7 @@ export default function DashboardPage() {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-      timeZone: 'Asia/Kolkata'
+      timeZone: 'Asia/Kolkata',
     });
   };
 
@@ -37,134 +37,125 @@ export default function DashboardPage() {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'Asia/Kolkata'
+      timeZone: 'Asia/Kolkata',
     });
   };
 
+  const hasEvents = !!events && events.length > 0;
+
   return (
-    <div className="h-full flex flex-col overflow-y-auto pr-2 pb-10 bg-gradient-to-b from-slate-900/50 to-slate-950/50">
-      
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-400" />
-            Manage Events
+    <div className="flex flex-col gap-5 sm:gap-8">
+      {/* Page header */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-white sm:text-2xl">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/10 sm:h-9 sm:w-9">
+              <Sparkles className="h-4 w-4 text-indigo-400" />
+            </span>
+            Manage events
           </h1>
-          <p className="text-sm text-slate-400 mt-1 flex items-center gap-2">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500/60 animate-pulse" />
-            Here is a list of your ongoing and scheduled events
+          <p className="mt-1.5 text-sm text-slate-400 sm:mt-2">
+            Your ongoing and scheduled events
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold rounded-full backdrop-blur-sm flex items-center gap-2">
-            <Users className="w-3.5 h-3.5" />
-            Total: {events?.length || 0}
-          </span>
-        </div>
-      </div>
 
-      {/* Empty State */}
-      {(!events || events.length === 0) ? (
-        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-800/60 rounded-3xl p-16 text-center bg-slate-900/30 backdrop-blur-sm hover:border-indigo-500/30 transition-all duration-500 group">
-          <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-full" />
-            <Calendar className="w-16 h-16 text-slate-600 group-hover:text-indigo-400 transition-all duration-300 relative z-10" />
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 sm:gap-2 sm:px-4 sm:py-2">
+          <Users className="h-3.5 w-3.5 text-indigo-400" />
+          <span className="hidden sm:inline">Total events</span>
+          <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 font-semibold text-indigo-300">
+            {events?.length || 0}
+          </span>
+        </span>
+      </header>
+
+      {!hasEvents ? (
+        /* Empty state */
+        <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-800 bg-slate-900/30 p-8 text-center sm:p-16">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 sm:h-20 sm:w-20">
+            <Calendar className="h-8 w-8 text-slate-500 sm:h-9 sm:w-9" />
           </div>
-          <h3 className="text-xl font-medium text-slate-300 mt-6">No events published yet</h3>
-          <p className="text-sm text-slate-500 mt-2 max-w-sm">
+          <h3 className="mt-5 text-lg font-semibold text-slate-200 sm:mt-6 sm:text-xl">No events published yet</h3>
+          <p className="mt-2 max-w-sm text-sm text-slate-500">
             Get started by creating your first event to manage bookings and capacity.
           </p>
-          <button className="mt-6 px-6 py-2.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 rounded-xl text-sm font-medium hover:bg-indigo-500/20 transition-all">
+          <button className="mt-6 w-full rounded-xl bg-indigo-600 px-5 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 sm:w-auto sm:py-2.5">
             + Create Event
           </button>
         </div>
       ) : (
-        /* Events Grid View */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        /* Events grid: 1 column on mobile with compact cards */
+        <div className="grid grid-cols-1 gap-3 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
           {events.map((event: EVENTS) => (
-            <div 
+            <article
               key={event.id}
-              className="group relative bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800/60 hover:border-indigo-500/40 rounded-2xl p-6 shadow-xl backdrop-blur-sm transition-all duration-300 hover:shadow-indigo-500/5 hover:scale-[1.02] hover:translate-y-[-2px]"
+              className="group flex flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-4 transition-colors hover:border-indigo-500/40 hover:bg-slate-900 sm:p-5"
             >
-              {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 via-indigo-500/0 to-indigo-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              
-              {/* Status indicator */}
-              <div className="absolute top-4 right-4 flex items-center gap-2">
-                <span className="text-[10px] font-mono tracking-wider uppercase px-2.5 py-1 bg-slate-800/80 text-slate-400 rounded-lg border border-slate-700/50 backdrop-blur-sm">
+              {/* Title row */}
+              <div className="flex items-start justify-between gap-3">
+                <h3
+                  title={event.name}
+                  className="line-clamp-2 text-base font-semibold leading-snug text-white transition-colors group-hover:text-indigo-300 sm:line-clamp-1 sm:text-lg"
+                >
+                  {event.name}
+                </h3>
+                <span className="shrink-0 rounded-md border border-slate-700/60 bg-slate-800/70 px-2 py-0.5 font-mono text-[11px] text-slate-400">
                   #{event.id}
                 </span>
               </div>
 
-              <div className="relative z-10">
-                {/* Event Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors pr-16 line-clamp-1">
-                    {event.name}
-                  </h3>
-                </div>
-
-                {/* Location */}
-                <div className="flex items-center gap-2 text-sm text-slate-400 mb-4 bg-slate-800/30 rounded-xl px-3 py-2 border border-slate-800/50">
-                  <MapPin className="w-4 h-4 text-indigo-400/70 shrink-0" />
-                  <span className="truncate">{event.place}</span>
-                </div>
-
-                {/* Event Details Grid */}
-                <div className="space-y-2.5 bg-slate-950/40 border border-slate-800/40 rounded-xl p-4">
-                  {/* Date */}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 flex items-center gap-2">
-                      <CalendarDays className="w-3.5 h-3.5" />
-                      Event Date
-                    </span>
-                    <span className="text-slate-200 font-medium">
-                      {formatIndianDateOnly(event.date)}
-                    </span>
-                  </div>
-
-                  {/* Time */}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5" />
-                      Event Time
-                    </span>
-                    <span className="text-slate-200 font-medium">
-                      {formatIndianTime(event.date)}
-                    </span>
-                  </div>
-
-                  {/* Booking Window */}
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800/40">
-                    <span className="text-slate-500 flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Booking Window
-                    </span>
-                    <span className="text-slate-300 text-[10px] font-medium">
-                      {formatIndianDate(event.bookingStart)} - {formatIndianDate(event.bookingEnd)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-4 pt-3 border-t border-slate-800/40 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      {event.capacity} Seats
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-slate-600">
-                    Created {formatIndianDateOnly(event.createdAt)}
-                  </span>
-                </div>
+              {/* Location */}
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-400 sm:mt-3">
+                <MapPin className="h-4 w-4 shrink-0 text-indigo-400/80" />
+                <span className="truncate" title={event.place}>
+                  {event.place}
+                </span>
               </div>
-            </div>
+
+              {/* Details: two tiles on mobile, divided rows from sm */}
+              <dl className="mt-4 grid grid-cols-2 gap-2.5 text-xs sm:mt-5 sm:gap-0 sm:divide-y sm:divide-slate-800/80 sm:rounded-xl sm:border sm:border-slate-800 sm:bg-slate-950/50">
+                <div className="flex flex-col gap-1 rounded-xl border border-slate-800 bg-slate-950/50 p-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:px-4 sm:py-2.5">
+                  <dt className="flex items-center gap-1.5 text-slate-500 sm:gap-2">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Event date
+                  </dt>
+                  <dd className="font-medium text-slate-200">{formatIndianDateOnly(event.date)}</dd>
+                </div>
+
+                <div className="flex flex-col gap-1 rounded-xl border border-slate-800 bg-slate-950/50 p-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:px-4 sm:py-2.5">
+                  <dt className="flex items-center gap-1.5 text-slate-500 sm:gap-2">
+                    <Clock className="h-3.5 w-3.5" />
+                    Event time
+                  </dt>
+                  <dd className="font-medium text-slate-200">{formatIndianTime(event.date)}</dd>
+                </div>
+
+                <div className="col-span-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 sm:rounded-none sm:border-0 sm:bg-transparent sm:px-4 sm:py-2.5">
+                  <dt className="flex items-center gap-1.5 text-slate-500 sm:gap-2">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Booking window
+                  </dt>
+                  <dd className="mt-1.5 leading-relaxed text-slate-300 sm:pl-5.5">
+                    {formatIndianDate(event.bookingStart)}
+                    <span className="mx-1.5 text-slate-600">to</span>
+                    {formatIndianDate(event.bookingEnd)}
+                  </dd>
+                </div>
+              </dl>
+
+              {/* Footer pinned to the bottom of the card */}
+              <div className="mt-auto flex items-center justify-between gap-3 pt-4 sm:pt-5">
+                <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  {event.capacity} Seats
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Created {formatIndianDateOnly(event.createdAt)}
+                </span>
+              </div>
+            </article>
           ))}
         </div>
       )}
-
     </div>
   );
 }

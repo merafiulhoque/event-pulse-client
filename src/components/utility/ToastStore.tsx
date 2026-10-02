@@ -40,7 +40,7 @@ export function dismissToast(id: string) {
 }
 
 export function showToast(options: ToastOptions): () => void {
-  const id = crypto.randomUUID();
+  const id = "ID-" + Date.now()
 
   const toast: Toast = {
     id,

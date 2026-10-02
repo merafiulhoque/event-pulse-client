@@ -77,7 +77,7 @@ export default function TicketBookingCheckoutPage() {
     const storageKey = `idempotencyKey:${eventId}`
     const idempotencyKey = sessionStorage.getItem(storageKey)
     if(!idempotencyKey){
-      const key = crypto.randomUUID()
+      const key = "IK" + Date.now()
       sessionStorage.setItem(storageKey, key)
     }
   }, [eventId])
